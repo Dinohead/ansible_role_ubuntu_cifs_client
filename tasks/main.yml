@@ -1,0 +1,113 @@
+---
+#========================
+# File tasks/main.yml
+#
+# Description: Creates a VM on the failover cluster
+#
+# Author: Derek 'dRock' Halsey
+#========================
+
+- name: APT | Install Cifs-utils
+  become: true
+  become_user: root
+  apt:
+    name: cifs-utils
+    state: present
+
+- name: SHELL | Stop cifs from hanging on shutdown
+  become: true
+  become_user: root
+  shell: "{{ item }}"
+  with_items:
+  - update-rc.d -f umountnfs.sh remove
+  - update-rc.d umountnfs.sh stop 15 0 6 .
+
+- name: GROUP | Ensure the samba group is present
+  become: true
+  become_user: root
+  group:
+    gid: "{{ ubuntu_cifs_client.group.gid }}"
+    name: "{{ ubuntu_cifs_client.group.name }}"
+    state: present
+
+- name: USER | add user to samba group
+  become: true
+  become_user: root
+  user:
+    name: "{{ ubuntu_cifs_client.user.name }}"
+    append: true
+    groups: "{{ ubuntu_cifs_client.group.name }}"
+
+- name: FILE | Ensure smbcredentials directory exists
+  become: true
+  become_user: root
+  file:
+    path: "{{ ubuntu_cifs_client.smbCredentialsDir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "u=rwx,g=,o="
+
+- name: FILE | Ensure smbcredentials server subdirectories exist
+  become: true
+  become_user: root
+  file:
+    path: "{{ ubuntu_cifs_client.smbCredentialsDir }}/{{ item.server }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "u=rwx,g=,o="
+  with_items: "{{ ubuntu_cifs_client.mount }}"
+  no_log: true
+
+- name: TEMPLATE | Template the smbcredentials file
+  become: true
+  become_user: root
+  template:
+    src: smbCredentials.j2
+    dest: "{{ ubuntu_cifs_client.smbCredentialsDir }}/{{ item.server }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "u=rw,g=,o="
+  with_items: "{{ ubuntu_cifs_client.mount }}"
+  no_log: true
+
+- name: FILE | create server mount points
+  become: true
+  become_user: root
+  file:
+    path: /mnt/{{ item.server }}
+    state: directory
+    owner: root
+    group: "{{ ubuntu_cifs_client.group.name }}"
+    mode: "u=rwx,g=rwx,o="
+  with_items: "{{ ubuntu_cifs_client.mount }}"
+  no_log: true
+
+- name: FILE | create share mount points
+  become: true
+  become_user: root
+  file:
+    path: /mnt/{{ item.server }}/{{ item.name }}
+    state: directory
+    owner: root
+    group: "{{ ubuntu_cifs_client.group.name }}"
+  with_items: "{{ ubuntu_cifs_client.mount }}"
+  no_log: true
+
+- name: LINEINFILE | Add entries to /etc/fstab to mount shares on startup
+  become: true
+  become_user: root
+  lineinfile:
+    path: /etc/fstab
+    line: "//{{ item.fqdn }}/{{ item.name }} /mnt/{{ item.server}}/{{ item.name }} cifs {{ item.permission }},iocharset=utf8,credentials={{ ubuntu_cifs_client.smbCredentialsDir }}/{{ item.server}}/{{ item.name }},file_mode=0770,dir_mode=0770,gid=2473 0 0"
+    state: present
+  with_items: "{{ ubuntu_cifs_client.mount }}"
+  no_log: true
+
+- name: COMMAND | Mount all shares defined in /etc/fstab
+  become: true
+  become_user: root
+  command: mount -a
+  args:
+      warn: false

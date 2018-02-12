@@ -1,0 +1,25 @@
+---
+#========================
+# File defaults/main.yml
+#
+# Description: default variables for role
+#
+# Author: Derek 'dRock' Halsey
+#========================
+
+ubuntu_cifs_client:
+  user:
+    name: "{{ ansible_user }}"
+    password: "{{ vault.password.text }}"
+  group:
+    gid: 2473
+    name: samba
+  smbCredentialsDir: /root/smbcredentials
+  mount: "{{ host.mount }}"
+#   mounts should contain a list of the form:
+#    - name: video
+#      server: spok
+#      username: "{{ vault.domainUser }}"
+#      password: "{{ vault.password.text }}"
+#      domain: "{{ domain }}"
+#      permission: rw
