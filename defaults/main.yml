@@ -9,12 +9,12 @@
 
 ubuntu_cifs_client:
   user:
-    name: "{{ ansible_user }}"
-    password: "{{ vault.password.text }}"
+    name: "{{ host.ansible_user }}"
+    password: "{{ host.ansible_password }}"
   group:
     gid: 2473
     name: samba
-  smbCredentialsDir: /root/smbcredentials
+  smbCredentialsDir: /root/.smbcredentials
   mount: "{{ host.mount }}"
 #   mounts should contain a list of the form:
 #    - name: video
